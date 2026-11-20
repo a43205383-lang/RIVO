@@ -344,8 +344,7 @@ export function ReviewExpensePage({ mode }: { mode: Mode }) {
             </div>
             <ReceiptGallery images={expense.images} urls={urls} />
             <p className="mt-3 text-[0.6875rem] leading-relaxed text-ink-faint">
-              Toca la imagen para ampliarla y comparar los datos. Los archivos son privados: usamos URLs
-              firmadas temporales.
+              Toca la imagen para ampliarla y comparar los datos. Los archivos son privados.
             </p>
           </section>
 

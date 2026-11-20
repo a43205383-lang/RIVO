@@ -32,8 +32,9 @@ El objeto debe tener exactamente esta forma:
   "notes": string|null
 }
 Reglas:
-- Si la imagen no es un recibo, devuelve isReceipt=false, legible=false y explica brevemente en "reason"; deja el resto en null, category="otros" e items=[].
-- Si es un recibo pero no se puede leer, devuelve isReceipt=true, legible=false y explica en "reason".
+- Clasifica primero la imagen. Considera recibo únicamente un comprobante de una compra, consumo o pago ya realizado, con señales visibles de transacción (por ejemplo comercio/proveedor y productos o servicios, fecha o importe). Una factura o ticket de pago también cuenta si acredita una transacción. No basta con que haya texto, números, precios o un logo.
+- Si es una foto común, documento de identidad, conversación, captura de una app sin comprobante de transacción, anuncio, menú, etiqueta de producto, formulario u otro documento que no pruebe una compra/pago, devuelve isReceipt=false, legible=false, explica brevemente por qué en "reason" y deja todos los campos del recibo en null, category="otros" e items=[]. No intentes convertir esos documentos en recibos.
+- Si sí es un recibo pero está cortado, borroso o no se puede leer con confianza, devuelve isReceipt=true, legible=false y explica en "reason".
 - No inventes datos. Si un campo no aparece, usa null. Nunca adivines un total.
 - Los montos son números sin símbolos de moneda y con punto decimal (ejemplo: 1250.50).
 - "date" siempre en formato YYYY-MM-DD. Si el recibo dice 20/11/2026, devuelve "2026-11-20".
@@ -91,6 +92,53 @@ function paymentMethod(value: unknown): string | null {
 }
 
 const CATEGORIES = new Set(['alimentos', 'combustible', 'transporte', 'oficina', 'servicios', 'otros'])
+
+function validateExtractionShape(raw: Record<string, unknown>): void {
+  const required = [
+    'isReceipt', 'legible', 'reason', 'merchant', 'date', 'currency', 'subtotal', 'tax', 'tip', 'total',
+    'paymentMethod', 'rnc', 'ncf', 'category', 'notes',
+  ]
+  if (required.some((key) => !(key in raw))) {
+    throw new HttpError('La IA devolvió campos incompletos.', 'invalid_json', 502)
+  }
+  if (typeof raw.isReceipt !== 'boolean' && typeof raw.isReceipt !== 'string') {
+    throw new HttpError('La IA devolvió isReceipt con un tipo inválido.', 'invalid_json', 502)
+  }
+  if (typeof raw.legible !== 'boolean' && typeof raw.legible !== 'string') {
+    throw new HttpError('La IA devolvió legible con un tipo inválido.', 'invalid_json', 502)
+  }
+  for (const key of ['reason', 'merchant', 'date', 'currency', 'paymentMethod', 'rnc', 'ncf', 'category', 'notes']) {
+    if (raw[key] !== null && typeof raw[key] !== 'string') {
+      throw new HttpError(`La IA devolvió ${key} con un tipo inválido.`, 'invalid_json', 502)
+    }
+  }
+  for (const key of ['subtotal', 'tax', 'tip', 'total']) {
+    if (raw[key] !== null && typeof raw[key] !== 'number' && typeof raw[key] !== 'string') {
+      throw new HttpError(`La IA devolvió ${key} con un tipo inválido.`, 'invalid_json', 502)
+    }
+  }
+  if (raw.items !== undefined && (!Array.isArray(raw.items) || raw.items.length > 100)) {
+    throw new HttpError('La IA devolvió items con un formato inválido.', 'invalid_json', 502)
+  }
+  if (Array.isArray(raw.items)) {
+    for (const item of raw.items) {
+      const row = asRecord(item)
+      if (
+        !('description' in row) || !('quantity' in row) || !('unitPrice' in row) || !('lineTotal' in row) ||
+        (row.description !== null && typeof row.description !== 'string') ||
+        ['quantity', 'unitPrice', 'lineTotal'].some((key) => row[key] !== null && typeof row[key] !== 'number' && typeof row[key] !== 'string')
+      ) {
+        throw new HttpError('La IA devolvió una línea de detalle inválida.', 'invalid_json', 502)
+      }
+    }
+  }
+  if (raw.confidence !== undefined) {
+    if (!raw.confidence || typeof raw.confidence !== 'object' || Array.isArray(raw.confidence) ||
+      Object.values(raw.confidence as Record<string, unknown>).some((value) => typeof value !== 'number')) {
+      throw new HttpError('La IA devolvió confidence con un formato inválido.', 'invalid_json', 502)
+    }
+  }
+}
 
 function category(value: unknown): string {
   if (typeof value !== 'string') return 'otros'
@@ -286,6 +334,7 @@ Deno.serve(async (req: Request) => {
           model: config.visionModel,
           maxTokens: 1800,
         })
+        validateExtractionShape(reply.data)
         break
       } catch (caught) {
         lastError = caught

@@ -308,7 +308,6 @@ export function ExpenseForm({
         <div className="flex items-start justify-between gap-3">
           <SectionHeading
             title="Líneas de detalle"
-            description="Opcional. Se guardan en una tabla relacionada."
           />
           {values.items.length > 0 && (
             <span className="rounded-full bg-canvas-deep px-2 py-0.5 text-[0.625rem] font-bold text-ink-soft">

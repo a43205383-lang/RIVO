@@ -14,7 +14,9 @@ const PATH_PATTERN = new RegExp(`^(${UUID})/(${UUID})/([^/]+)$`, 'i')
 const SYSTEM_PROMPT = `Eres un extractor de recibos para una app de gastos de República Dominicana.
 Devuelve únicamente JSON con esta forma:
 {"isReceipt":boolean,"legible":boolean,"reason":string|null,"merchant":string|null,"date":"YYYY-MM-DD"|null,"currency":"DOP"|"USD"|null,"subtotal":number|null,"tax":number|null,"tip":number|null,"total":number|null,"paymentMethod":"efectivo"|"tarjeta"|"transferencia"|"otro"|null,"rnc":string|null,"ncf":string|null,"category":"alimentos"|"combustible"|"transporte"|"oficina"|"servicios"|"otros","items":[{"description":string,"quantity":number|null,"unitPrice":number|null,"lineTotal":number|null}],"confidence":{"merchant":number,"date":number,"total":number},"notes":string|null}
-No inventes datos. Si no es recibo, usa isReceipt=false, legible=false, campos de recibo null, category="otros" e items=[]. Si no se puede leer, legible=false. Moneda predeterminada DOP solo si el recibo la demuestra. Montos como números sin símbolo. Fecha ISO. ITBIS es tax. Items solo visibles, máximo 100. Confidence de 0 a 1.`
+Clasifica primero la imagen antes de extraer datos. Considera recibo únicamente un comprobante de una compra, consumo o pago ya realizado, con señales visibles de transacción (por ejemplo comercio/proveedor y productos o servicios, fecha o importe). Una factura o ticket de pago también cuenta si acredita una transacción. No basta con que haya texto, números, precios o un logo.
+Si la imagen es una foto común, documento de identidad, conversación, captura de una app sin comprobante de transacción, anuncio, menú, etiqueta de producto, formulario u otro documento que no pruebe una compra/pago, usa isReceipt=false y legible=false; explica brevemente por qué en reason y deja todos los campos de recibo en null, category="otros" e items=[]. No intentes convertir esos documentos en recibos.
+Si sí es un recibo pero está cortado, borroso o no se puede leer con confianza, usa isReceipt=true y legible=false. No inventes datos. Moneda predeterminada DOP solo si el recibo la demuestra. Montos como números sin símbolo. Fecha ISO. ITBIS es tax. Items solo visibles, máximo 100. Confidence de 0 a 1.`
 
 type AppError = Error & { status?: number; code?: string }
 
@@ -101,6 +103,35 @@ function normalize(raw: Record<string, unknown>) {
     date: isoDate(raw.date), currency, subtotal: money(raw.subtotal), tax: money(raw.tax), tip: money(raw.tip),
     total: money(raw.total), paymentMethod, rnc: nullableText(raw.rnc), ncf: nullableText(raw.ncf),
     category: allowedCategories.includes(category) ? category : 'otros', items, confidence, notes: nullableText(raw.notes),
+  }
+}
+
+function validateExtractionShape(raw: Record<string, unknown>): void {
+  const required = [
+    'isReceipt', 'legible', 'reason', 'merchant', 'date', 'currency', 'subtotal', 'tax', 'tip', 'total',
+    'paymentMethod', 'rnc', 'ncf', 'category', 'notes',
+  ]
+  if (required.some((key) => !(key in raw))) throw fail('Gemini devolvió campos incompletos.', 'invalid_json', 502)
+  if (typeof raw.isReceipt !== 'boolean' && typeof raw.isReceipt !== 'string') throw fail('isReceipt tiene un tipo inválido.', 'invalid_json', 502)
+  if (typeof raw.legible !== 'boolean' && typeof raw.legible !== 'string') throw fail('legible tiene un tipo inválido.', 'invalid_json', 502)
+  for (const key of ['reason', 'merchant', 'date', 'currency', 'paymentMethod', 'rnc', 'ncf', 'category', 'notes']) {
+    if (raw[key] !== null && typeof raw[key] !== 'string') throw fail(`${key} tiene un tipo inválido.`, 'invalid_json', 502)
+  }
+  for (const key of ['subtotal', 'tax', 'tip', 'total']) {
+    if (raw[key] !== null && typeof raw[key] !== 'number' && typeof raw[key] !== 'string') throw fail(`${key} tiene un tipo inválido.`, 'invalid_json', 502)
+  }
+  if (raw.items !== undefined && (!Array.isArray(raw.items) || raw.items.length > 100)) throw fail('items tiene un formato inválido.', 'invalid_json', 502)
+  if (Array.isArray(raw.items)) for (const item of raw.items) {
+    const row = asRecord(item)
+    if (!('description' in row) || !('quantity' in row) || !('unitPrice' in row) || !('lineTotal' in row) ||
+      (row.description !== null && typeof row.description !== 'string') ||
+      ['quantity', 'unitPrice', 'lineTotal'].some((key) => row[key] !== null && typeof row[key] !== 'number' && typeof row[key] !== 'string')) {
+      throw fail('Una línea de detalle tiene un formato inválido.', 'invalid_json', 502)
+    }
+  }
+  if (raw.confidence !== undefined && (!raw.confidence || typeof raw.confidence !== 'object' || Array.isArray(raw.confidence) ||
+    Object.values(raw.confidence as Record<string, unknown>).some((value) => typeof value !== 'number'))) {
+    throw fail('confidence tiene un formato inválido.', 'invalid_json', 502)
   }
 }
 
@@ -210,6 +241,7 @@ Deno.serve(async (req: Request) => {
       try {
         const prompt = attempt === 0 ? SYSTEM_PROMPT : `${SYSTEM_PROMPT}\n\nTu respuesta anterior no era JSON válido. Devuelve únicamente un objeto JSON.`
         reply = await callGemini(geminiKey, model, prompt, parts)
+        validateExtractionShape(reply.data)
         break
       } catch (error) {
         lastError = error

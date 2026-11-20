@@ -3,7 +3,7 @@ import { useAuth } from '@/features/auth/providers/AuthProvider'
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import { listExpenses } from '@/features/expenses/api/expensesApi'
 import { applyFiltersLocally } from '@/features/expenses/lib/filters'
-import { readCachedExpenses } from '@/features/expenses/lib/cache'
+import { readCachedExpenses, sortExpensesNewestFirst } from '@/features/expenses/lib/cache'
 import { errorMessage } from '@/shared/lib/errors'
 import type { ExpenseFilters, ExpenseWithRelations } from '@/features/expenses/types'
 import { EXPENSE_PAGE_SIZE } from '@/features/expenses/constants'
@@ -88,7 +88,10 @@ export function useExpenses(filters: ExpenseFilters, pageSize = EXPENSE_PAGE_SIZ
       pageRef.current = nextPage
       setExpenses((current) => {
         const seen = new Set(current.map((expense) => expense.id))
-        return [...current, ...result.expenses.filter((expense) => !seen.has(expense.id))]
+        return sortExpensesNewestFirst([
+          ...current,
+          ...result.expenses.filter((expense) => !seen.has(expense.id)),
+        ])
       })
       setTotal(result.total)
       setHasMore(result.hasMore)

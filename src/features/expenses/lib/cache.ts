@@ -2,6 +2,17 @@ import type { ExpenseWithRelations } from '@/features/expenses/types'
 
 const MAX_CACHED = 200
 
+export function sortExpensesNewestFirst<T extends Pick<ExpenseWithRelations, 'expense_date' | 'created_at'>>(
+  expenses: T[],
+): T[] {
+  return [...expenses].sort((a, b) => {
+    const aDate = a.expense_date ?? a.created_at.slice(0, 10)
+    const bDate = b.expense_date ?? b.created_at.slice(0, 10)
+    if (aDate !== bDate) return bDate.localeCompare(aDate)
+    return b.created_at.localeCompare(a.created_at)
+  })
+}
+
 function listKey(userId: string) {
   return `rivo:cache:expenses:${userId}`
 }
@@ -26,14 +37,7 @@ export function mergeCachedExpenses(userId: string, items: ExpenseWithRelations[
     const existing = readCachedExpenses(userId)
     const map = new Map(existing.map((expense) => [expense.id, expense]))
     for (const expense of items) map.set(expense.id, expense)
-    const merged = [...map.values()]
-      .sort((a, b) => {
-        const aDate = a.expense_date ?? a.created_at.slice(0, 10)
-        const bDate = b.expense_date ?? b.created_at.slice(0, 10)
-        if (aDate === bDate) return b.created_at.localeCompare(a.created_at)
-        return bDate.localeCompare(aDate)
-      })
-      .slice(0, MAX_CACHED)
+    const merged = sortExpensesNewestFirst([...map.values()]).slice(0, MAX_CACHED)
     localStorage.setItem(listKey(userId), JSON.stringify({ updatedAt: Date.now(), items: merged }))
   } catch {
     // Private mode / storage full: the online experience still works.

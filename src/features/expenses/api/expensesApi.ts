@@ -17,7 +17,7 @@ import type {
   ExpenseWithRelations,
   MonthlySummary,
 } from '@/features/expenses/types'
-import { mergeCachedExpenses, removeCachedExpense, cacheExpense } from '@/features/expenses/lib/cache'
+import { mergeCachedExpenses, removeCachedExpense, cacheExpense, sortExpensesNewestFirst } from '@/features/expenses/lib/cache'
 import { errorMessage } from '@/shared/lib/errors'
 
 const EXPENSE_SELECT = `
@@ -90,7 +90,7 @@ export async function listExpenses({
   const { data, error, count } = await query.range(offset, offset + pageSize - 1)
   throwIfError(error, 'No pudimos cargar los gastos.')
 
-  const expenses = (data ?? []).map(normalizeExpense)
+  const expenses = sortExpensesNewestFirst((data ?? []).map(normalizeExpense))
   mergeCachedExpenses(userId, expenses)
   const total = count ?? expenses.length
   return { expenses, total, hasMore: offset + expenses.length < total }
@@ -113,7 +113,7 @@ export async function listAllExpenses(filters: ExpenseFilters, max = 1000): Prom
 
   const { data, error } = await query
   throwIfError(error, 'No pudimos preparar la exportación.')
-  return (data ?? []).map(normalizeExpense)
+  return sortExpensesNewestFirst((data ?? []).map(normalizeExpense))
 }
 
 export async function getExpense(expenseId: string): Promise<ExpenseWithRelations> {
