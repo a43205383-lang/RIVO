@@ -6,6 +6,7 @@ import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { AuthError, PasswordField } from '@/features/auth/components/PasswordField'
 import { Button } from '@/shared/components/ui/Button'
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle'
+import { errorMessage } from '@/shared/lib/errors'
 
 export function ResetPasswordPage() {
   useDocumentTitle('Nueva contraseña')
@@ -29,10 +30,15 @@ export function ResetPasswordPage() {
       return
     }
     setLoading(true)
-    const result = await changePassword(password)
-    setLoading(false)
-    if (result.error) setError(result.error)
-    else setDone(true)
+    try {
+      const result = await changePassword(password)
+      if (result.error) setError(result.error)
+      else setDone(true)
+    } catch (caught) {
+      setError(errorMessage(caught, 'No pudimos actualizar la contraseña. Intenta de nuevo.'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

@@ -28,6 +28,7 @@ interface AuthContextValue {
   session: Session | null
   profile: ProfileRow | null
   loading: boolean
+  authError: string | null
   profileLoading: boolean
   profileError: string | null
   isAccountant: boolean
@@ -42,11 +43,28 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error('timeout')), timeoutMs)
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<ProfileRow | null>(null)
   const [loading, setLoading] = useState(env.configured)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
 
@@ -60,11 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileLoading(true)
     setProfileError(null)
     try {
-      const nextProfile = await fetchProfileWithRetry(nextUser.id)
+      const nextProfile = await withTimeout(fetchProfileWithRetry(nextUser.id), 12_000)
       setProfile(nextProfile)
     } catch {
       setProfile(null)
-      setProfileError('No pudimos cargar tu perfil. Revisa que la migración SQL se haya ejecutado.')
+      setProfileError('No pudimos cargar tu perfil. Revisa tu conexión e inténtalo de nuevo.')
     } finally {
       setProfileLoading(false)
     }
@@ -78,18 +96,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let active = true
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      setUser(data.session?.user ?? null)
-      if (data.session?.user) {
-        void hydrateProfile(data.session.user).finally(() => {
-          if (active) setLoading(false)
-        })
-      } else {
+    void withTimeout(supabase.auth.getSession(), 12_000)
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          setSession(null)
+          setUser(null)
+          setAuthError('No pudimos recuperar tu sesión. Intenta iniciar sesión de nuevo.')
+          setLoading(false)
+          return
+        }
+        setAuthError(null)
+        setSession(data.session)
+        setUser(data.session?.user ?? null)
+        if (data.session?.user) {
+          void hydrateProfile(data.session.user).finally(() => {
+            if (active) setLoading(false)
+          })
+        } else {
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        setSession(null)
+        setUser(null)
+        setProfile(null)
+        setAuthError('No pudimos recuperar tu sesión. Intenta iniciar sesión de nuevo.')
         setLoading(false)
-      }
-    })
+      })
 
     const {
       data: { subscription },
@@ -97,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return
       setSession(nextSession)
       setUser(nextSession?.user ?? null)
+      if (nextSession) setAuthError(null)
       if (!nextSession) {
         setProfile(null)
         setProfileLoading(false)
@@ -163,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
+      authError,
       profileLoading,
       profileError,
       isAccountant: profile?.role === 'accountant',
@@ -179,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
+      authError,
       profileLoading,
       profileError,
       signIn,

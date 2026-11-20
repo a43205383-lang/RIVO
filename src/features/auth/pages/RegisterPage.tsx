@@ -7,6 +7,7 @@ import { AuthError, PasswordField } from '@/features/auth/components/PasswordFie
 import { Button } from '@/shared/components/ui/Button'
 import { Field, Input } from '@/shared/components/ui/Field'
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle'
+import { errorMessage } from '@/shared/lib/errors'
 
 export function RegisterPage() {
   useDocumentTitle('Crear cuenta')
@@ -33,17 +34,22 @@ export function RegisterPage() {
     if (Object.keys(nextErrors).length > 0) return
 
     setLoading(true)
-    const result = await signUp(email, password, fullName)
-    setLoading(false)
-    if (result.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await signUp(email, password, fullName)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+      if (result.needsEmailConfirmation) {
+        setNeedsConfirmation(true)
+        return
+      }
+      navigate('/', { replace: true })
+    } catch (caught) {
+      setError(errorMessage(caught, 'No pudimos crear la cuenta. Intenta de nuevo.'))
+    } finally {
+      setLoading(false)
     }
-    if (result.needsEmailConfirmation) {
-      setNeedsConfirmation(true)
-      return
-    }
-    navigate('/', { replace: true })
   }
 
   if (needsConfirmation) {

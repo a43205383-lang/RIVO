@@ -7,6 +7,7 @@ import { AuthError } from '@/features/auth/components/PasswordField'
 import { Button } from '@/shared/components/ui/Button'
 import { Field, Input } from '@/shared/components/ui/Field'
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle'
+import { errorMessage } from '@/shared/lib/errors'
 
 export function ForgotPasswordPage() {
   useDocumentTitle('Recuperar contraseña')
@@ -24,10 +25,15 @@ export function ForgotPasswordPage() {
       return
     }
     setLoading(true)
-    const result = await requestReset(email)
-    setLoading(false)
-    if (result.error) setError(result.error)
-    else setSent(true)
+    try {
+      const result = await requestReset(email)
+      if (result.error) setError(result.error)
+      else setSent(true)
+    } catch (caught) {
+      setError(errorMessage(caught, 'No pudimos enviar el enlace. Intenta de nuevo.'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

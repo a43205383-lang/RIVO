@@ -64,6 +64,22 @@ supabase functions deploy ask-expenses
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` los inyecta Supabase automáticamente. Las funciones exigen JWT válido (`verify_jwt = true` en `supabase/config.toml`) y comprueban además la sesión y la propiedad de las rutas de imagen.
 
+## Uso móvil y sin conexión
+
+- La interfaz es responsive desde 320 px; en dispositivos con pantalla táctil los controles tienen un área mínima de 44 × 44 px.
+- `public/manifest.webmanifest` configura el nombre, iconos de 192 y 512 px y modo `standalone`. El service worker se registra solo en producción. Hay que abrir Rivo con internet una vez antes de poder cargar el shell offline e instalarla desde el navegador.
+- El service worker guarda el shell, los recursos visitados y hasta 80 respuestas de imágenes firmadas de Storage. Las llamadas a Auth, REST y Edge Functions requieren red.
+- La lista conserva hasta 200 gastos por usuario en `localStorage`; muestra esa copia con aviso si falla la red. El detalle solo funciona sin conexión si ese gasto ya se guardó en caché.
+- Las capturas offline se guardan en IndexedDB, hasta 10 recibos. Se procesan cuando vuelve la conexión mientras la app está abierta o al volver a abrirla. No hay Background Sync que procese capturas con la app cerrada.
+- Las pantallas principales incluyen estados de carga, error y vacío; el límite global de errores de React muestra una opción para recargar.
+
+## Límites actuales de IA
+
+- El cliente reduce cada foto a un máximo de 1600 px por lado y 1.5 MiB; la extracción acepta hasta 5 imágenes por llamada. Los PDF se admiten como adjuntos manuales hasta 5 MiB, pero no se envían a Gemini.
+- Los límites diarios predeterminados son 50 extracciones y 30 consultas por usuario. Actualmente la función consulta el uso y luego inserta el registro en pasos separados: llamadas simultáneas pueden rebasar el cupo y no hay límite por minuto. No se debe considerar todavía una protección estricta de costos contra ráfagas.
+- `ask-expenses` consulta los gastos dentro del alcance del usuario (o de contabilidad) y envía como máximo los 150 más recientes a Gemini. La función filtra los IDs de gastos que devuelve el modelo, pero el texto de la respuesta —incluidos importes calculados— no se verifica contra una agregación determinista de la base de datos. Para respuestas numéricas exactas, este requisito aún necesita endurecerse.
+- La lista de preguntas no puede representar gastos anteriores a los 150 registros recibidos en esa petición. Si el usuario pregunta por un período o dato fuera de ese conjunto, el modelo puede carecer de contexto suficiente.
+
 ## Usuarios de prueba
 
 Tras aplicar las migraciones, crea los usuarios de demostración con:
@@ -95,4 +111,4 @@ npm run typecheck  # comprobación de tipos
 npm run build      # tsc -b && vite build
 ```
 
-Se recomienda Node 22.12+ (ver `.nvmrc`). El build se ha verificado con `npm run build`.
+Se requiere Node 22.12+ (ver `.nvmrc`); Vite avisa si se compila con una versión inferior. `npm run build` ejecuta el chequeo TypeScript y genera los archivos de producción.

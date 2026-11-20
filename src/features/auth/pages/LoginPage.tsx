@@ -7,10 +7,11 @@ import { AuthError, PasswordField } from '@/features/auth/components/PasswordFie
 import { Button } from '@/shared/components/ui/Button'
 import { Field, Input } from '@/shared/components/ui/Field'
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle'
+import { errorMessage } from '@/shared/lib/errors'
 
 export function LoginPage() {
   useDocumentTitle('Entrar')
-  const { signIn } = useAuth()
+  const { signIn, authError } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -32,13 +33,18 @@ export function LoginPage() {
     if (Object.keys(nextErrors).length > 0) return
 
     setLoading(true)
-    const result = await signIn(email, password)
-    setLoading(false)
-    if (result.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await signIn(email, password)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+      navigate(from, { replace: true })
+    } catch (caught) {
+      setError(errorMessage(caught, 'No pudimos iniciar sesión. Intenta de nuevo.'))
+    } finally {
+      setLoading(false)
     }
-    navigate(from, { replace: true })
   }
 
   return (
@@ -61,6 +67,8 @@ export function LoginPage() {
           Correo confirmado. Ya puedes iniciar sesión.
         </div>
       )}
+
+      {authError && <div className="mb-5"><AuthError>{authError}</AuthError></div>}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <Field label="Correo electrónico" htmlFor="email" error={fieldErrors.email} required>
