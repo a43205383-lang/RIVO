@@ -4,12 +4,12 @@ Escáner móvil de recibos con extracción asistida por IA y almacenamiento priv
 
 ## Supabase
 
-El esquema versionado está en `supabase/migrations/`. Si ya aplicaste una migración anterior, aplica las posteriores en orden: `20261120010000_align_frontend_contract.sql`, `20261120020000_admin_role_updates.sql` y `20261120030000_allow_pdf_receipts.sql`. En una instalación nueva, aplica las cuatro en orden.
+Para un proyecto nuevo, ejecuta el esquema consolidado `supabase/schema.sql` una vez en Supabase SQL Editor. Si ya aplicaste `20261120000000_initial_schema.sql` y no quieres recrear el proyecto, ejecuta en orden las migraciones siguientes: `20261120010000_align_frontend_contract.sql`, `20261120020000_admin_role_updates.sql` y `20261120030000_allow_pdf_receipts.sql`.
 
 ### Aplicar la migración
 
 1. Crea un proyecto en Supabase.
-2. Si ya ejecutaste la migración inicial, abre las tres migraciones posteriores en SQL Editor y ejecútalas una vez cada una. Preservan las filas existentes, añaden las tablas, columnas, RPC y políticas que requiere el frontend, permiten asignar roles desde el panel administrativo y habilitan recibos PDF. Para una instalación nueva, aplica las cuatro migraciones en orden o inicializa Supabase CLI (`supabase init` y `supabase link`) y ejecuta `supabase db push`.
+2. En un proyecto vacío, abre `supabase/schema.sql` en SQL Editor y ejecútalo una vez. Si el proyecto ya tiene la primera migración, no ejecutes el esquema consolidado: aplica las tres migraciones de actualización en el orden indicado arriba. También puedes usar Supabase CLI con los archivos de migración (`supabase init`, `supabase link`, `supabase db push`).
 3. En **Authentication → Users**, crea o invita al usuario contador. Después de que se cree su perfil, asígnale el rol de contador desde SQL Editor:
 
    ```sql
@@ -46,16 +46,16 @@ Nunca pongas la clave `service_role` en una variable `VITE_*`: Vite la incluirí
 
 Hay dos funciones en `supabase/functions/`:
 
-- `extract-receipt`: valida la sesión, descarga las imágenes del bucket privado, llama a OpenAI Vision y devuelve los datos normalizados del recibo.
-- `ask-expenses`: responde preguntas sobre los gastos visibles para el usuario (todo el equipo solo si es contador) y devuelve hasta 50 gastos relacionados.
+- `extract-receipt`: valida la sesión, descarga las imágenes del bucket privado, llama a Gemini Vision y devuelve los datos normalizados del recibo.
+- `ask-expenses`: responde preguntas sobre los gastos visibles para el usuario (todo el equipo solo si es contador) con Gemini y devuelve hasta 50 gastos relacionados.
 
 Ambas registran cada llamada en `ai_usage` y aplican un límite diario configurable. Configura los secretos y despliega:
 
 ```bash
-supabase secrets set OPENAI_API_KEY=sk-...
-# Opcionales: modelo y límites diarios
-supabase secrets set OPENAI_VISION_MODEL=gpt-4o
-supabase secrets set OPENAI_TEXT_MODEL=gpt-4o-mini
+supabase secrets set GEMINI_API_KEY=...
+# Opcionales: modelos y límites diarios
+supabase secrets set GEMINI_VISION_MODEL=gemini-3.5-flash
+supabase secrets set GEMINI_TEXT_MODEL=gemini-3.5-flash
 supabase secrets set AI_EXTRACT_DAILY_LIMIT=50
 supabase secrets set AI_ASK_DAILY_LIMIT=30
 supabase functions deploy extract-receipt

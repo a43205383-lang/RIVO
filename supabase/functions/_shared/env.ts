@@ -9,9 +9,9 @@ export const config = {
   supabaseUrl: (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, ''),
   anonKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
   serviceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  openAiKey: Deno.env.get('OPENAI_API_KEY') ?? '',
-  visionModel: Deno.env.get('OPENAI_VISION_MODEL') ?? 'gpt-4o',
-  textModel: Deno.env.get('OPENAI_TEXT_MODEL') ?? 'gpt-4o-mini',
+  geminiApiKey: Deno.env.get('GEMINI_API_KEY') ?? '',
+  visionModel: Deno.env.get('GEMINI_VISION_MODEL') ?? 'gemini-3.5-flash',
+  textModel: Deno.env.get('GEMINI_TEXT_MODEL') ?? 'gemini-3.5-flash',
   extractDailyLimit: numberFrom('AI_EXTRACT_DAILY_LIMIT', 50),
   askDailyLimit: numberFrom('AI_ASK_DAILY_LIMIT', 30),
 } as const
@@ -26,5 +26,5 @@ export function serviceHeaders(): Record<string, string> {
 export function assertServerConfig(): void {
   if (!config.supabaseUrl) throw new Error('Falta SUPABASE_URL')
   if (!config.serviceRoleKey) throw new Error('Falta SUPABASE_SERVICE_ROLE_KEY')
-  if (!config.openAiKey) throw new Error('Falta OPENAI_API_KEY')
+  if (!config.geminiApiKey) throw new Error('Falta GEMINI_API_KEY')
 }

@@ -1,7 +1,7 @@
 import { config, assertServerConfig, serviceHeaders } from '../_shared/env.ts'
 import { requireUser, isAccountant } from '../_shared/auth.ts'
 import { HttpError, corsHeaders, failure, json, readJson } from '../_shared/http.ts'
-import { askModel, asRecord } from '../_shared/openai.ts'
+import { askModel, asRecord } from '../_shared/gemini.ts'
 import { startUsage } from '../_shared/usage.ts'
 
 const MAX_ROWS = 150

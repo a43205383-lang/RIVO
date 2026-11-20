@@ -15,7 +15,7 @@ const configured =
   !looksLikePlaceholder(rawUrl) &&
   !looksLikePlaceholder(rawKey) &&
   /^https?:\/\//i.test(rawUrl) &&
-  rawKey.length > 20
+  (rawKey.startsWith('sb_publishable_') || rawKey.length > 20)
 
 export const env = {
   supabaseUrl: configured ? rawUrl.replace(/\/+$/, '') : 'https://placeholder.supabase.co',

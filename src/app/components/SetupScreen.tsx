@@ -17,8 +17,8 @@ const steps = [
   {
     icon: TerminalSquare,
     title: '3. Despliega las Edge Functions',
-    body: 'La llave de IA vive solo en el servidor. Configura el secreto y despliega la extracción y las consultas.',
-    code: 'supabase secrets set OPENAI_API_KEY=sk-...\nsupabase functions deploy extract-receipt\nsupabase functions deploy ask-expenses',
+    body: 'La llave de Gemini vive solo en el servidor. Configura el secreto y despliega la extracción y las consultas.',
+    code: 'supabase secrets set GEMINI_API_KEY=...\nsupabase functions deploy extract-receipt\nsupabase functions deploy ask-expenses',
   },
 ]
 
