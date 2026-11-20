@@ -22,6 +22,8 @@ export async function processOfflineQueue(userId: string): Promise<OfflineQueueR
         const processed = await processReceiptSet({
           userId,
           files: item.files,
+          // Stable ID makes uploads and database writes safe to retry after a partial failure.
+          expenseId: item.id,
         })
         await deleteQueuedCapture(item.id)
         result.processed.push(processed.expenseId)

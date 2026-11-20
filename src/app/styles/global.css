@@ -239,3 +239,12 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  a[class*='min-h-'] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
