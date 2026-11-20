@@ -1,0 +1,7 @@
+project_id = "rivo"
+
+[functions.extract-receipt]
+verify_jwt = true
+
+[functions.ask-expenses]
+verify_jwt = true
